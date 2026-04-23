@@ -1,0 +1,18 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+myenv/
+venv/
+
+# Chroma database
+chroma_db/
+
+# Local docs if needed
+docs/
+
+# Environment files
+.env
+
+.vscode
