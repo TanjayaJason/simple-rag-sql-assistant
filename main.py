@@ -4,6 +4,10 @@ app = FastAPI()
 
 items_db = []
 
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
+
 # CREATE
 @app.post("/items")
 def create_item(item: dict):

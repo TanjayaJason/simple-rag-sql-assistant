@@ -8,6 +8,7 @@ venv/
 
 # Chroma database
 chroma_db/
+vanna_chroma/
 
 # Local docs if needed
 docs/

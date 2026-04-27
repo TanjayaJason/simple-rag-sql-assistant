@@ -23,6 +23,7 @@ def chunk_text(text, chunk_size=50, overlap=5):
         end = start + chunk_size
         chunk = " ".join(words[start:end])
         chunks.append(chunk)
+
         start += chunk_size - overlap
 
     return chunks
@@ -59,7 +60,49 @@ def extract_text(filepath):
     return ""
 
 # -----------------------------
-# REINDEX FUNCTION
+# INDEX ONE FILE
+# -----------------------------
+def index_file(filepath, filename):
+    client = chromadb.PersistentClient(path="./chroma_db")
+    collection = client.get_or_create_collection(name=COLLECTION_NAME)
+
+    text = extract_text(filepath)
+
+    if not text.strip():
+        return 0
+
+    chunks = chunk_text(text)
+
+    all_chunks = []
+    all_embeddings = []
+    all_ids = []
+    all_metadatas = []
+
+    for i, chunk in enumerate(chunks):
+        embedding = ollama.embed(
+            model=EMBED_MODEL,
+            input=chunk
+        )["embeddings"][0]
+
+        all_chunks.append(chunk)
+        all_embeddings.append(embedding)
+        all_ids.append(f"{filename}_chunk_{i}")
+        all_metadatas.append({
+            "source": filename,
+            "chunk": i
+        })
+
+    collection.add(
+        documents=all_chunks,
+        embeddings=all_embeddings,
+        ids=all_ids,
+        metadatas=all_metadatas
+    )
+
+    return len(chunks)
+
+# -----------------------------
+# REINDEX ALL FILES
 # -----------------------------
 def reindex_documents():
     client = chromadb.PersistentClient(path="./chroma_db")
@@ -69,56 +112,12 @@ def reindex_documents():
     except:
         pass
 
-    collection = client.get_or_create_collection(name=COLLECTION_NAME)
     total_chunks = 0
 
     for filename in os.listdir(DOCS_FOLDER):
         filepath = os.path.join(DOCS_FOLDER, filename)
 
         if filename.endswith((".txt", ".pdf", ".docx")):
-
-            text = extract_text(filepath)
-
-            if not text.strip():
-                continue
-
-            chunks = chunk_text(text)
-
-            all_chunks = []
-            all_embeddings = []
-            all_ids = []
-            all_metadatas = []
-
-            for i, chunk in enumerate(chunks):
-                embedding = ollama.embed(
-                    model=EMBED_MODEL,
-                    input=chunk
-                )["embeddings"][0]
-
-                all_chunks.append(chunk)
-                all_embeddings.append(embedding)
-                all_ids.append(f"{filename}_chunk_{i}")
-                all_metadatas.append({
-                    "source": filename,
-                    "chunk": i
-                })
-
-            collection.add(
-                documents=all_chunks,
-                embeddings=all_embeddings,
-                ids=all_ids,
-                metadatas=all_metadatas
-            )
-
-            print(f"Indexed {filename} with {len(chunks)} chunks")
-
-            total_chunks += len(chunks)
+            total_chunks += index_file(filepath, filename)
 
     return total_chunks
-
-# -----------------------------
-# MANUAL RUN
-# -----------------------------
-if __name__ == "__main__":
-    total = reindex_documents()
-    print(f"Indexed {total} chunks successfully")
