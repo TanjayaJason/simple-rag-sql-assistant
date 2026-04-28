@@ -121,3 +121,25 @@ def reindex_documents():
             total_chunks += index_file(filepath, filename)
 
     return total_chunks
+
+# -----------------------------
+# DELETE FILE
+# -----------------------------
+def delete_file(filename: str) -> int:
+    client = chromadb.PersistentClient(path="./chroma_db")
+    collection = client.get_or_create_collection(name=COLLECTION_NAME)
+
+    # Get all chunk IDs belonging to this file
+    results = collection.get(where={"source": filename})
+
+    if not results["ids"]:
+        return 0
+
+    collection.delete(ids=results["ids"])
+
+    # Delete physical file from disk too
+    filepath = os.path.join(DOCS_FOLDER, filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+
+    return len(results["ids"])

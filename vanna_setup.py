@@ -13,8 +13,13 @@ load_dotenv()
 EMBED_MODEL = "mxbai-embed-large"
 LLM_MODEL = "llama3.2:3b"
 
-
 class OllamaEmbeddingFunction(EmbeddingFunction):
+    def __init__(self):
+        pass
+
+    def name(self) -> str:
+        return "ollama-embedding-function"
+
     def __call__(self, input):
         import ollama
         response = ollama.embed(model=EMBED_MODEL, input=input)

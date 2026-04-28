@@ -1,5 +1,6 @@
 # Python cache
 __pycache__/
+.pytest_cache/
 *.pyc
 
 # Virtual environment
@@ -16,4 +17,5 @@ docs/
 # Environment files
 .env
 
+# VS Code
 .vscode
