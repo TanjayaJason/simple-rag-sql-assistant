@@ -40,18 +40,8 @@ DB_PASSWORD=your_db_password
 DB_PORT=5432
 ```
 
-### 4. Create conversation history table
-Run this SQL on your PostgreSQL database:
-```sql
-CREATE TABLE conversation_history (
-    id SERIAL PRIMARY KEY,
-    question TEXT NOT NULL,
-    answer TEXT NOT NULL,
-    tool_used VARCHAR(10) NOT NULL,
-    sql_generated TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
+### 4. Set up the database
+Create all required tables by running the SQL in the **Database Setup** section below.
 
 ### 5. Train Vanna
 ```bash
@@ -64,6 +54,47 @@ uvicorn chat:app --reload
 ```
 
 Swagger UI available at: http://localhost:8000/docs
+
+---
+
+## Database Setup
+
+Run the following SQL on your PostgreSQL database to create all required tables:
+
+### Business Tables
+```sql
+CREATE TABLE courses (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(100),
+    category VARCHAR(50),
+    price NUMERIC(10,2)
+);
+
+CREATE TABLE students (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(100)
+);
+
+CREATE TABLE enrollments (
+    id SERIAL PRIMARY KEY,
+    student_id INT REFERENCES students(id),
+    course_id INT REFERENCES courses(id),
+    purchase_date DATE
+);
+```
+
+### Conversation History Table
+```sql
+CREATE TABLE conversation_history (
+    id SERIAL PRIMARY KEY,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    tool_used VARCHAR(10) NOT NULL,
+    sql_generated TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
 ---
 
@@ -115,6 +146,18 @@ curl -X DELETE http://localhost:8000/docs/chromadb.txt
 
 ---
 
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| DB_HOST | PostgreSQL host |
+| DB_NAME | PostgreSQL database name |
+| DB_USER | PostgreSQL username |
+| DB_PASSWORD | PostgreSQL password |
+| DB_PORT | PostgreSQL port (default: 5432) |
+
+---
+
 ## Project Structure
 ```
 project/
@@ -129,18 +172,6 @@ project/
 ├── chroma_db/       # RAG vector store
 └── vanna_chroma/    # Vanna vector store
 ```
-
----
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| DB_HOST | PostgreSQL host |
-| DB_NAME | PostgreSQL database name |
-| DB_USER | PostgreSQL username |
-| DB_PASSWORD | PostgreSQL password |
-| DB_PORT | PostgreSQL port (default: 5432) |
 
 ---
 
