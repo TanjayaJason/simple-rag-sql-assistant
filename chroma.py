@@ -11,6 +11,8 @@ EMBED_MODEL = "mxbai-embed-large"
 DOCS_FOLDER = "./docs"
 COLLECTION_NAME = "docs"
 
+client = chromadb.PersistentClient(path="./chroma_db")
+
 # -----------------------------
 # CHUNKING FUNCTION
 # -----------------------------
@@ -63,7 +65,6 @@ def extract_text(filepath):
 # INDEX ONE FILE
 # -----------------------------
 def index_file(filepath, filename):
-    client = chromadb.PersistentClient(path="./chroma_db")
     collection = client.get_or_create_collection(name=COLLECTION_NAME)
 
     text = extract_text(filepath)
@@ -105,11 +106,9 @@ def index_file(filepath, filename):
 # REINDEX ALL FILES
 # -----------------------------
 def reindex_documents():
-    client = chromadb.PersistentClient(path="./chroma_db")
-
     try:
         client.delete_collection(name=COLLECTION_NAME)
-    except:
+    except Exception:
         pass
 
     total_chunks = 0
@@ -126,7 +125,6 @@ def reindex_documents():
 # DELETE FILE
 # -----------------------------
 def delete_file(filename: str) -> int:
-    client = chromadb.PersistentClient(path="./chroma_db")
     collection = client.get_or_create_collection(name=COLLECTION_NAME)
 
     # Get all chunk IDs belonging to this file

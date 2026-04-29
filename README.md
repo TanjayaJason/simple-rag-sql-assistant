@@ -1,6 +1,4 @@
 # Agentic RAG + Text2SQL Backend
-BHP-AI-TRAIN-001 | PT Berca Hardayaperkasa
-
 A FastAPI backend that answers natural language questions by routing to either a SQL database (via Vanna AI) or a document knowledge base (via ChromaDB RAG).
 
 ---
@@ -10,7 +8,8 @@ A FastAPI backend that answers natural language questions by routing to either a
 - **Vanna AI** — Text2SQL generation
 - **ChromaDB** — Vector store for RAG and Vanna
 - **PostgreSQL** — Business database
-- **Ollama** — Local LLM and embedding model
+- **OpenAI GPT-4o-mini** — LLM for SQL generation and RAG answers
+- **Ollama** — Local embedding model only
 
 ---
 
@@ -24,9 +23,8 @@ pip install -r requirements.txt
 ### 2. Pull Ollama models
 Make sure you have Ollama installed first: https://ollama.com/download
 
-Then pull the required models:
+Then pull the required embedding model:
 ```bash
-ollama pull llama3.2:3b
 ollama pull mxbai-embed-large
 ```
 
@@ -38,6 +36,7 @@ DB_NAME=your_db_name
 DB_USER=your_db_user
 DB_PASSWORD=your_db_password
 DB_PORT=5432
+OPENAI_API_KEY=sk-...
 ```
 
 ### 4. Set up the database
@@ -105,7 +104,7 @@ CREATE TABLE conversation_history (
 | GET | /health | Service liveness check |
 | POST | /ask | Ask a question (auto-routes to SQL or RAG) |
 | POST | /train | Add new Vanna training data |
-| POST | /docs/upload | Upload document to RAG store |
+| POST | /upload | Upload document to RAG store |
 | POST | /reindex | Reindex all documents |
 | GET | /history | Get recent Q&A history |
 | DELETE | /docs/{doc_id} | Remove document from store |
@@ -123,8 +122,8 @@ curl -X POST http://localhost:8000/ask \
 
 ### Upload a document
 ```bash
-curl -X POST http://localhost:8000/docs/upload \
-  -F "file=@./docs/chromadb.txt"
+curl -X POST http://localhost:8000/upload \
+  -F "file=@./chromadb.txt"
 ```
 
 ### Add training data
@@ -155,6 +154,7 @@ curl -X DELETE http://localhost:8000/docs/chromadb.txt
 | DB_USER | PostgreSQL username |
 | DB_PASSWORD | PostgreSQL password |
 | DB_PORT | PostgreSQL port (default: 5432) |
+| OPENAI_API_KEY | Your OpenAI API key |
 
 ---
 

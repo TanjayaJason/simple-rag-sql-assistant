@@ -3,6 +3,8 @@ import chromadb
 import ollama
 import logging
 import psycopg2
+import time
+from openai import OpenAI
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -15,8 +17,10 @@ from vanna_setup import vn
 # -----------------------------
 load_dotenv()  # <-- moved to top
 
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 EMBED_MODEL = "mxbai-embed-large"
-LLM_MODEL = "llama3.2:3b"
+LLM_MODEL = "gpt-4o-mini"
 DOCS_FOLDER = "./docs"
 COLLECTION_NAME = "docs"
 
@@ -96,15 +100,14 @@ SQL_KEYWORDS = [
     "how many", "total", "revenue", "count", "sum", "average",
     "top", "highest", "lowest", "most", "least", "list all",
     "show all", "which course", "which student", "enrolled",
-    "price", "per course", "per student", "last month"
+    "price", "per course", "per student", "last month",
+    "tell me about the course", "about the course", "course details"
 ]
 
 RAG_KEYWORDS = [
-    # General
     "what is", "explain", "describe", "how does", "how do",
     "what are", "tell me about", "guide", "documentation",
     "definition", "difference between", "compare",
-    # Specific topics
     "python", "rag", "retrieval", "llm", "language model",
     "chromadb", "vector", "embedding", "vanna", "vanna ai",
     "fastapi", "postgresql", "postgres", "endpoint", "api",
@@ -149,11 +152,11 @@ REASON: <one sentence explanation>
 
 Question: {question}
 """
-    response = ollama.chat(
+    response = openai_client.chat.completions.create(
         model=LLM_MODEL,
         messages=[{"role": "user", "content": prompt}]
     )
-    content = response["message"]["content"]
+    content = response.choices[0].message.content
 
     intent = "RAG"
     confidence = "low"
@@ -191,7 +194,7 @@ def run_rag(question: str):
 
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=3,
+        n_results=5,
         include=["documents", "metadatas"]
     )
 
@@ -213,12 +216,12 @@ Question:
 
 Answer:
 """
-    response = ollama.chat(
+    response = openai_client.chat.completions.create(
         model=LLM_MODEL,
         messages=[{"role": "user", "content": prompt}]
     )
 
-    return response["message"]["content"], sources
+    return response.choices[0].message.content, sources
 
 def run_sql(question: str):
     sql = vn.generate_sql(question=question)
@@ -227,7 +230,8 @@ def run_sql(question: str):
 
     prompt = f"""
 You are a data analyst. Answer the question directly and concisely based on the query result below.
-Do not restate the table. Do not explain your reasoning. Just give the answer in 1-2 sentences.
+Your answer must reflect ALL rows in the result, not just a summary total.
+Do not restate the table. Do not explain your reasoning.
 If the result is empty, say "No data found."
 
 Query Result:
@@ -238,11 +242,11 @@ Question:
 
 Answer:
 """
-    response = ollama.chat(
+    response = openai_client.chat.completions.create(
         model=LLM_MODEL,
         messages=[{"role": "user", "content": prompt}]
     )
-    return response["message"]["content"], sql, df.to_dict(orient="records")
+    return response.choices[0].message.content, sql, df.to_dict(orient="records")
 
 # -----------------------------
 # ENDPOINTS
@@ -301,6 +305,8 @@ def train(request: TrainRequest):
 
 @app.post("/ask")
 def ask_question(request: QuestionRequest):
+    start = time.time()
+
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
@@ -310,7 +316,7 @@ def ask_question(request: QuestionRequest):
         try:
             answer, sql, result = run_sql(request.question)
             save_history(request.question, answer, "SQL", sql)
-            return {
+            response = {
                 "question": request.question,
                 "tool_used": "SQL",
                 "classifier": method,
@@ -326,7 +332,7 @@ def ask_question(request: QuestionRequest):
         try:
             answer, sources = run_rag(request.question)
             save_history(request.question, answer, "RAG")
-            return {
+            response = {
                 "question": request.question,
                 "tool_used": "RAG",
                 "classifier": method,
@@ -337,6 +343,12 @@ def ask_question(request: QuestionRequest):
         except Exception as e:
             logger.error(f"RAG failed: {e}")
             raise HTTPException(status_code=500, detail=f"RAG execution failed: {str(e)}")
+
+    elapsed = round(time.time() - start, 2)
+    logger.info(f"Request completed in {elapsed}s — tool: {intent}")
+    response["response_time_seconds"] = elapsed
+
+    return response
 
 @app.get("/history")
 def history(limit: int = 10):

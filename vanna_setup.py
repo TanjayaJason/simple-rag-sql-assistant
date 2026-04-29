@@ -2,16 +2,19 @@ from vanna.chromadb import ChromaDB_VectorStore
 from vanna.base import VannaBase
 from dotenv import load_dotenv
 from chromadb.utils.embedding_functions import EmbeddingFunction
+from openai import OpenAI
 import os
 import ollama
-
-load_dotenv()
 
 # -----------------------------
 # CONFIG
 # -----------------------------
+load_dotenv()
+
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 EMBED_MODEL = "mxbai-embed-large"
-LLM_MODEL = "llama3.2:3b"
+LLM_MODEL = "gpt-4o-mini"
 
 class OllamaEmbeddingFunction(EmbeddingFunction):
     def __init__(self):
@@ -21,7 +24,6 @@ class OllamaEmbeddingFunction(EmbeddingFunction):
         return "ollama-embedding-function"
 
     def __call__(self, input):
-        import ollama
         response = ollama.embed(model=EMBED_MODEL, input=input)
         return response["embeddings"]
 
@@ -47,11 +49,11 @@ class MyVanna(ChromaDB_VectorStore, VannaBase):
         else:
             messages = [{"role": "user", "content": prompt}]
 
-        response = ollama.chat(
+        response = openai_client.chat.completions.create(
             model=LLM_MODEL,
             messages=messages
         )
-        return response["message"]["content"]
+        return response.choices[0].message.content
 
     def system_message(self, message: str):
         return {"role": "system", "content": message}
@@ -67,9 +69,8 @@ class MyVanna(ChromaDB_VectorStore, VannaBase):
 # -----------------------------
 vn = MyVanna(config={
     "path": "./vanna_chroma",
-    "embedding_function": OllamaEmbeddingFunction(),  # <-- pass it explicitly
+    "embedding_function": OllamaEmbeddingFunction(),
     "n_results": 10,
-    "verbose": False
 })
 
 # -----------------------------
