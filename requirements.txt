@@ -7,7 +7,7 @@ ollama
 psycopg2-binary
 pypdf
 python-docx
-vanna
+vanna=0.6.4
 pytest
 httpx
 openai
