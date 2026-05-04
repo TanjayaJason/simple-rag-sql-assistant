@@ -4,6 +4,7 @@ import ollama
 import logging
 import psycopg2
 from openai import OpenAI
+from vanna_setup import vn
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
@@ -208,9 +209,14 @@ Answer:
     return response.choices[0].message.content, sources
 
 def run_sql(question: str):
-    from vanna_setup import vn
     sql = vn.generate_sql(question=question)
+    if not sql.strip().upper().startswith("SELECT"):
+        raise ValueError(f"Vanna could not generate SQL: {sql}")
+
     df = vn.run_sql(sql=sql)
+    if df.empty:
+        return "No data found.", sql, []
+    
     data_as_text = df.to_string(index=False)
 
     prompt = f"""
