@@ -13,7 +13,7 @@ load_dotenv()
 
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-EMBED_MODEL = "mxbai-embed-large"
+EMBED_MODEL = "qwen3-embedding:0.6b"
 LLM_MODEL = "gpt-4o-mini"
 
 class OllamaEmbeddingFunction(EmbeddingFunction):
@@ -24,7 +24,8 @@ class OllamaEmbeddingFunction(EmbeddingFunction):
         return "ollama-embedding-function"
 
     def __call__(self, input):
-        response = ollama.embed(model=EMBED_MODEL, input=input)
+        processed = [text + "<|endoftext|>" for text in input]
+        response = ollama.embed(model=EMBED_MODEL, input=processed)
         return response["embeddings"]
 
 # -----------------------------
@@ -38,7 +39,7 @@ class MyVanna(ChromaDB_VectorStore, VannaBase):
     def generate_embedding(self, data: str, **kwargs):
         response = ollama.embed(
             model=EMBED_MODEL,
-            input=data
+            input=data + "<|endoftext|>"
         )
         return response["embeddings"][0]
 

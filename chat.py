@@ -15,7 +15,7 @@ load_dotenv()
 
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-EMBED_MODEL = "mxbai-embed-large"
+EMBED_MODEL = "qwen3-embedding:0.6b"
 LLM_MODEL = "gpt-4o-mini"
 DOCS_FOLDER = "./docs"
 COLLECTION_NAME = "docs"
@@ -174,7 +174,7 @@ def run_rag(question: str):
 
     query_embedding = ollama.embed(
         model=EMBED_MODEL,
-        input=question
+        input=question + "<|endoftext|>"
     )["embeddings"][0]
 
     results = collection.query(

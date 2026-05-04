@@ -7,7 +7,7 @@ from docx import Document
 # -----------------------------
 # CONFIG
 # -----------------------------
-EMBED_MODEL = "mxbai-embed-large"
+EMBED_MODEL = "qwen3-embedding:0.6b"
 DOCS_FOLDER = "./docs"
 COLLECTION_NAME = "docs"
 
@@ -82,7 +82,7 @@ def index_file(filepath, filename):
     for i, chunk in enumerate(chunks):
         embedding = ollama.embed(
             model=EMBED_MODEL,
-            input=chunk
+            input=chunk + "<|endoftext|>"
         )["embeddings"][0]
 
         all_chunks.append(chunk)
