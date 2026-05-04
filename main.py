@@ -3,11 +3,11 @@ import time
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from chroma import reindex_documents, index_file, delete_file
 from chat import (
-    classify_intent, run_rag, run_sql,
     save_history, get_history, logger
 )
 from schema import QuestionRequest, TrainRequest
 from vanna_setup import vn
+from langchain_agent import agent_executor
 
 # -----------------------------
 # CONFIG
@@ -76,52 +76,70 @@ def ask_question(request: QuestionRequest):
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    intent, method, reason = classify_intent(request.question)
+    try:
+        result = agent_executor.invoke({"messages": [{"role": "user", "content": request.question}]})
+        content = result["messages"][-1].content
 
-    if intent == "SQL":
-        try:
-            answer, sql, result = run_sql(request.question)
-            save_history(request.question, answer, "SQL", sql)
-            response = {
-                "question": request.question,
-                "tool_used": "SQL",
-                "classifier": method,
-                "confidence_note": reason,
-                "sql": sql,
-                "result": result,
-                "answer": answer
-            }
-        except Exception as e:
-            logger.error(f"SQL failed: {e}")
-            raise HTTPException(status_code=500, detail=f"SQL execution failed: {str(e)}")
-    else:
-        try:
-            answer, sources = run_rag(request.question)
-            save_history(request.question, answer, "RAG")
-            response = {
-                "question": request.question,
-                "tool_used": "RAG",
-                "classifier": method,
-                "confidence_note": reason,
-                "sources": sources,
-                "answer": answer
-            }
-        except Exception as e:
-            logger.error(f"RAG failed: {e}")
-            raise HTTPException(status_code=500, detail=f"RAG execution failed: {str(e)}")
+        # Extract tool outputs from intermediate messages
+        sql = None
+        sources = []
 
-    elapsed = round(time.time() - start, 2)
-    logger.info(f"Request completed in {elapsed}s — tool: {intent}")
-    response["response_time_seconds"] = elapsed
+        for msg in result["messages"]:
+            if hasattr(msg, "content") and isinstance(msg.content, str):
+                if msg.content.startswith("SQL:"):
+                    # Extract SQL from sql_tool output
+                    for line in msg.content.splitlines():
+                        if line.startswith("SQL:"):
+                            sql = line.replace("SQL:", "").strip()
+                if msg.content.startswith("SOURCES:"):
+                    # Extract sources from rag_tool output
+                    for line in msg.content.splitlines():
+                        if line.startswith("SOURCES:"):
+                            sources = [s.strip() for s in line.replace("SOURCES:", "").split(",")]
 
-    return response
+        # Parse tool_used, confidence, reason from final answer
+        tool_used = "RAG"
+        confidence = "low"
+        reason = "Could not determine"
+
+        for line in content.splitlines():
+            if line.startswith("TOOL_USED:"):
+                tool_used = "SQL" if "sql_tool" in line.lower() else "RAG"
+            elif line.startswith("CONFIDENCE:"):
+                confidence = line.split(":")[1].strip()
+            elif line.startswith("REASON:"):
+                reason = line.split(":")[1].strip()
+
+        # Clean answer
+        answer = "\n".join(
+            line for line in content.splitlines()
+            if not line.startswith(("TOOL_USED:", "CONFIDENCE:", "REASON:"))
+        ).strip()
+
+        elapsed = round(time.time() - start, 2)
+        logger.info(f"Request completed in {elapsed}s — tool: {tool_used}")
+        save_history(request.question, answer, tool_used)
+
+        return {
+            "question": request.question,
+            "tool_used": tool_used,
+            "confidence": confidence,
+            "reason": reason,
+            "sql": sql,
+            "sources": sources,
+            "answer": answer,
+            "response_time_seconds": elapsed
+        }
+    except Exception as e:
+        logger.error(f"Agent failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Agent execution failed: {str(e)}")
 
 @app.get("/history")
 def history(limit: int = 10):
     if limit <= 0:
         raise HTTPException(status_code=400, detail="Limit must be greater than 0")
-    if limit > 100:
-        raise HTTPException(status_code=400, detail="Limit cannot exceed 100")
+    if limit > 10:
+        raise HTTPException(status_code=400, detail="Limit cannot exceed 10")
     try:
         records = get_history(limit=limit)
         return {
