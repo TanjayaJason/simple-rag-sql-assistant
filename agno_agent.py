@@ -11,7 +11,7 @@ import os
 load_dotenv()
 
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-EMBED_MODEL = "mxbai-embed-large"
+EMBED_MODEL = "qwen3-embedding:0.6b"
 LLM_MODEL = "gpt-4o-mini"
 COLLECTION_NAME = "docs"
 
@@ -50,6 +50,7 @@ def rag_tool(question: str) -> str:
 Use the following context to answer the user's question.
 If the answer is not in the context, say "I don't know."
 Do not infer, assume, or guess.
+Only use information directly relevant to the question — ignore unrelated context.
 
 Context:
 {context}

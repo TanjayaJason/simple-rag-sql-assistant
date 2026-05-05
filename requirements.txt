@@ -11,3 +11,4 @@ vanna=0.6.4
 pytest
 httpx
 openai
+agno
