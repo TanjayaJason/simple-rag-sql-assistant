@@ -120,8 +120,8 @@ def ask_question(request: QuestionRequest):
 def history(limit: int = 10):
     if limit <= 0:
         raise HTTPException(status_code=400, detail="Limit must be greater than 0")
-    if limit > 100:
-        raise HTTPException(status_code=400, detail="Limit cannot exceed 100")
+    if limit > 10:
+        raise HTTPException(status_code=400, detail="Limit cannot exceed 10")
     try:
         records = get_history(limit=limit)
         return {
