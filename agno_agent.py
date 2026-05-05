@@ -32,12 +32,12 @@ def rag_tool(question: str) -> str:
 
     query_embedding = ollama.embed(
         model=EMBED_MODEL,
-        input=question
+        input=question + "<|endoftext|>"
     )["embeddings"][0]
 
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=5,
+        n_results=3,
         include=["documents", "metadatas"]
     )
 
@@ -83,6 +83,10 @@ def sql_tool(question: str) -> str:
         return f"ERROR: Could not generate valid SQL: {sql}"
 
     df = vn.run_sql(sql=sql)
+
+    if df.empty:
+        return "No data found."
+    
     data_as_text = df.to_string(index=False)
 
     prompt = f"""

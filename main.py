@@ -82,6 +82,21 @@ def ask_question(request: QuestionRequest):
         tool_used = "RAG"
         confidence = "low"
         reason = "Could not determine"
+        sql = None
+        sources = []
+
+        # Extract SQL and SOURCES from tool messages
+        if result.messages:
+            for msg in result.messages:
+                if hasattr(msg, "content") and isinstance(msg.content, str):
+                    if "SQL:" in msg.content:
+                        for line in msg.content.splitlines():
+                            if line.startswith("SQL:"):
+                                sql = line.replace("SQL:", "").strip()
+                    if "SOURCES:" in msg.content:
+                        for line in msg.content.splitlines():
+                            if line.startswith("SOURCES:"):
+                                sources = [s.strip() for s in line.replace("SOURCES:", "").split(",")]
 
         for line in content.splitlines():
             if line.startswith("TOOL_USED:"):
@@ -107,6 +122,8 @@ def ask_question(request: QuestionRequest):
             "tool_used": tool_used,
             "confidence": confidence,
             "reason": reason,
+            "sql": sql,
+            "sources": sources,
             "answer": answer,
             "response_time_seconds": elapsed
         }
