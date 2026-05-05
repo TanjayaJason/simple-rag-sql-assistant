@@ -2,9 +2,7 @@ import os
 import time
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from chroma import reindex_documents, index_file, delete_file
-from chat import (
-    save_history, get_history, logger
-)
+from chat import save_history, get_history, logger
 from schema import QuestionRequest, TrainRequest
 from vanna_setup import vn
 from langchain_agent import agent_executor

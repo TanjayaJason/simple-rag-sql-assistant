@@ -38,7 +38,7 @@ def rag_tool(question: str) -> str:
 
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=5,
+        n_results=3,
         include=["documents", "metadatas"]
     )
 
@@ -51,6 +51,7 @@ def rag_tool(question: str) -> str:
 Use the following context to answer the user's question.
 If the answer is not in the context, say "I don't know."
 Do not infer, assume, or guess.
+Only use information directly relevant to the question — ignore unrelated context.
 
 Context:
 {context}
