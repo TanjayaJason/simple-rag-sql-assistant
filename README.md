@@ -25,7 +25,7 @@ Make sure you have Ollama installed first: https://ollama.com/download
 
 Then pull the required embedding model:
 ```bash
-ollama pull mxbai-embed-large
+ollama pull qwen3-embedding:0.6b
 ```
 
 ### 3. Configure environment variables
@@ -44,12 +44,12 @@ Create all required tables by running the SQL in the **Database Setup** section 
 
 ### 5. Train Vanna
 ```bash
-python vanna_train.py
+python scripts/vanna_train.py
 ```
 
 ### 6. Run the server
 ```bash
-uvicorn chat:app --reload
+uvicorn app.main:app --reload
 ```
 
 Swagger UI available at: http://localhost:8000/docs
@@ -83,6 +83,44 @@ CREATE TABLE enrollments (
 );
 ```
 
+### Sample Data
+```sql
+-- Courses
+INSERT INTO courses (title, category, price) VALUES
+('Python Fundamentals', 'Programming', 100.00),
+('FastAPI Backend', 'Backend', 120.00),
+('RAG Basics', 'AI', 150.00),
+('ChromaDB Essentials', 'AI', 130.00),
+('PostgreSQL Mastery', 'Database', 110.00),
+('LLM Engineering', 'AI', 200.00),
+('Docker for Developers', 'DevOps', 90.00),
+('REST API Design', 'Backend', 115.00),
+('Vector Databases', 'AI', 175.00),
+('Data Engineering with Python', 'Programming', 160.00);
+
+-- Students
+INSERT INTO students (name, email) VALUES
+('Alice', 'alice@email.com'),
+('Bob', 'bob@email.com'),
+('Charlie', 'charlie@email.com'),
+('Diana', 'diana@email.com'),
+('Evan', 'evan@email.com'),
+('Fiona', 'fiona@email.com'),
+('George', 'george@email.com'),
+('Hannah', 'hannah@email.com');
+
+-- Enrollments
+INSERT INTO enrollments (student_id, course_id, purchase_date) VALUES
+(1, 1, '2026-04-01'), (1, 3, '2026-04-02'), (1, 6, '2026-04-10'),
+(2, 1, '2026-04-03'), (2, 4, '2026-04-03'), (2, 9, '2026-04-15'),
+(3, 3, '2026-04-04'), (3, 4, '2026-04-04'), (3, 7, '2026-04-20'),
+(4, 2, '2026-04-05'), (4, 5, '2026-04-05'), (4, 8, '2026-04-18'),
+(5, 6, '2026-04-06'), (5, 9, '2026-04-06'), (5, 10, '2026-04-22'),
+(6, 1, '2026-04-07'), (6, 3, '2026-04-07'),
+(7, 2, '2026-04-08'), (7, 5, '2026-04-08'), (7, 7, '2026-04-25'),
+(8, 4, '2026-04-09'), (8, 6, '2026-04-09'), (8, 10, '2026-04-28');
+```
+
 ### Conversation History Table
 ```sql
 CREATE TABLE conversation_history (
@@ -102,7 +140,7 @@ CREATE TABLE conversation_history (
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | /health | Service liveness check |
-| POST | /ask | Ask a question (auto-routes to SQL or RAG) |
+| POST | /ask | Ask a question (auto-routes to SQL or RAG via LangChain agent) |
 | POST | /train | Add new Vanna training data |
 | POST | /upload | Upload document to RAG store |
 | POST | /reindex | Reindex all documents |
@@ -123,7 +161,7 @@ curl -X POST http://localhost:8000/ask \
 ### Upload a document
 ```bash
 curl -X POST http://localhost:8000/upload \
-  -F "file=@./chromadb.txt"
+  -F "file=@./data/docs/chromadb.txt"
 ```
 
 ### Add training data
@@ -161,21 +199,34 @@ curl -X DELETE http://localhost:8000/docs/chromadb.txt
 ## Project Structure
 ```
 project/
-├── chat.py          # Main FastAPI app
-├── chroma.py        # RAG indexing and retrieval
-├── vanna_setup.py   # Vanna + PostgreSQL setup
-├── vanna_train.py   # One-time Vanna training script
-├── test_chat.py     # Pytest tests
-├── requirements.txt
+├── app/                    # Main application code
+│   ├── __init__.py
+│   ├── main.py             # FastAPI endpoints
+│   ├── chat.py             # Business logic and history helpers
+│   ├── chroma.py           # RAG indexing and retrieval
+│   ├── schema.py           # Pydantic models
+│   ├── vanna_setup.py      # Vanna + PostgreSQL setup
+│
+├── scripts/
+│   └── vanna_train.py      # One-time Vanna training script
+│
+├── data/
+│   ├── docs/               # Uploaded documents
+│   ├── chroma_db/          # RAG vector store
+│   └── vanna_chroma/       # Vanna vector store
+│
+├── tests/
+│   └── test_chat.py        # Pytest tests
+│
 ├── .env
-├── docs/            # Uploaded documents
-├── chroma_db/       # RAG vector store
-└── vanna_chroma/    # Vanna vector store
+├── .gitignore
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
 ## Running Tests
 ```bash
-pytest test_chat.py -v
+pytest tests/test_chat.py -v
 ```

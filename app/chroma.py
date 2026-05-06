@@ -8,10 +8,10 @@ from docx import Document
 # CONFIG
 # -----------------------------
 EMBED_MODEL = "qwen3-embedding:0.6b"
-DOCS_FOLDER = "./docs"
+DOCS_FOLDER = "./data/docs"
 COLLECTION_NAME = "docs"
 
-client = chromadb.PersistentClient(path="./chroma_db")
+client = chromadb.PersistentClient(path="./data/chroma_db")
 
 # -----------------------------
 # CHUNKING FUNCTION

@@ -4,7 +4,7 @@ import ollama
 import logging
 import psycopg2
 from openai import OpenAI
-from vanna_setup import vn
+from app.vanna_setup import vn
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
@@ -17,7 +17,7 @@ openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 EMBED_MODEL = "qwen3-embedding:0.6b"
 LLM_MODEL = "gpt-4o-mini"
-DOCS_FOLDER = "./docs"
+DOCS_FOLDER = "./data/docs"
 COLLECTION_NAME = "docs"
 
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # CHROMA AND DATABASE SETUP
 # -----------------------------
-client = chromadb.PersistentClient(path="./chroma_db")
+client = chromadb.PersistentClient(path="./data/chroma_db")
 
 def get_db_connection():
     return psycopg2.connect(

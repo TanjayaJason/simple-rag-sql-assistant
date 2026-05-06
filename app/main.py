@@ -1,18 +1,37 @@
 import os
 import time
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from chroma import reindex_documents, index_file, delete_file
-from chat import (
+from contextlib import asynccontextmanager
+from app.chroma import reindex_documents, index_file, delete_file
+from app.chat import (
     classify_intent, run_rag, run_sql,
     save_history, get_history, logger
 )
-from schema import QuestionRequest, TrainRequest
-from vanna_setup import vn
+from app.schema import QuestionRequest, TrainRequest
+from app.vanna_setup import vn
 
 # -----------------------------
 # CONFIG
 # -----------------------------
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    logger.info("🚀 Server starting...")
+    logger.info("✅ ChromaDB ready")
+    logger.info("✅ Vanna ready")
+    logger.info("✅ PostgreSQL ready")
+    
+    yield  # server is running, handling requests
+    
+    # shutdown
+    logger.info("👋 Server shutting down...")
+
+app = FastAPI(
+    title="Agentic RAG + Text2SQL Backend",
+    description="A hybrid RAG + Text2SQL system",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 # -----------------------------
 # ENDPOINTS
@@ -26,7 +45,7 @@ def upload_document(file: UploadFile = File(...)):
     if not file.filename.endswith((".txt", ".pdf", ".docx")):
         raise HTTPException(status_code=400, detail="Only TXT, PDF, DOCX supported")
 
-    filepath = os.path.join("./docs", file.filename)
+    filepath = os.path.join("./data/docs", file.filename)
     try:
         with open(filepath, "wb") as f:
             f.write(file.file.read())
