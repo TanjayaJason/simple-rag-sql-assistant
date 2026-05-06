@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # DATABASE SETUP
 # -----------------------------
-
 def get_db_connection():
     return psycopg2.connect(
         host=os.getenv("DB_HOST"),

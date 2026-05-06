@@ -20,8 +20,16 @@ class OllamaEmbeddingFunction(EmbeddingFunction):
     def __init__(self):
         pass
 
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         return "ollama-embedding-function"
+
+    def get_config(self) -> dict:
+        return {"model": EMBED_MODEL}
+
+    @classmethod
+    def build_from_config(cls, config: dict) -> "OllamaEmbeddingFunction":
+        return cls()
 
     def __call__(self, input):
         processed = [text + "<|endoftext|>" for text in input]
@@ -69,7 +77,7 @@ class MyVanna(ChromaDB_VectorStore, VannaBase):
 # INITIALIZE VANNA
 # -----------------------------
 vn = MyVanna(config={
-    "path": "./vanna_chroma",
+    "path": "./data/vanna_chroma",
     "embedding_function": OllamaEmbeddingFunction(),
     "n_results": 10,
 })
