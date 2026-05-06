@@ -5,7 +5,7 @@ import ollama
 import chromadb
 from openai import OpenAI
 from dotenv import load_dotenv
-from vanna_setup import vn
+from app.vanna_setup import vn
 import os
 
 load_dotenv()
@@ -15,7 +15,7 @@ EMBED_MODEL = "qwen3-embedding:0.6b"
 LLM_MODEL = "gpt-4o-mini"
 COLLECTION_NAME = "docs"
 
-chroma_client = chromadb.PersistentClient(path="./chroma_db")
+chroma_client = chromadb.PersistentClient(path="./data/chroma_db")
 
 # -----------------------------
 # TOOLS

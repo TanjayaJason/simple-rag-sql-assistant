@@ -1,4 +1,4 @@
-from vanna_setup import vn
+from app.vanna_setup import vn
 
 # =========================================================
 # 1. TRAIN DATABASE SCHEMA (DDL)

@@ -7,12 +7,8 @@ __pycache__/
 myenv/
 venv/
 
-# Chroma database
-chroma_db/
-vanna_chroma/
-
-# Local docs if needed
-docs/
+# Chroma and local docs
+data/
 
 # Environment files
 .env

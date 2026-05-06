@@ -1,16 +1,15 @@
-import pytest
 from fastapi.testclient import TestClient
-from chat import app
+from app.main import app
 
 client = TestClient(app)
 
 # -----------------------------
 # 1. TEST ROOT
 # -----------------------------
-def test_root():
-    response = client.get("/")
+def test_health():
+    response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello There!"}
+    assert response.json() == {"status": "ok", "version": "1.0.0"}
 
 # -----------------------------
 # 2. TEST ASK - RAG ROUTING
@@ -22,6 +21,10 @@ def test_ask_routes_to_rag():
     assert data["tool_used"] == "RAG"
     assert "answer" in data
     assert "question" in data
+    assert "confidence" in data
+    assert "reason" in data
+    assert "sources" in data
+    assert data["sql"] is None
 
 # -----------------------------
 # 3. TEST ASK - SQL ROUTING
@@ -31,9 +34,13 @@ def test_ask_routes_to_sql():
     assert response.status_code == 200
     data = response.json()
     assert data["tool_used"] == "SQL"
-    assert "sql" in data
-    assert "result" in data
     assert "answer" in data
+    assert "question" in data
+    assert "confidence" in data
+    assert "reason" in data
+    assert "sql" in data
+    assert data["sql"] is not None
+    assert data["sources"] == []
 
 # -----------------------------
 # 4. TEST ASK - EMPTY QUESTION
@@ -109,9 +116,9 @@ def test_history_invalid_limit():
 # 11. TEST HISTORY - LIMIT EXCEEDED
 # -----------------------------
 def test_history_limit_exceeded():
-    response = client.get("/history?limit=101")
+    response = client.get("/history?limit=11")
     assert response.status_code == 400
-    assert response.json()["detail"] == "Limit cannot exceed 100"
+    assert response.json()["detail"] == "Limit cannot exceed 10"
 
 # -----------------------------
 # 12. TEST UPLOAD - WRONG FILE TYPE
@@ -123,3 +130,13 @@ def test_upload_wrong_file_type():
     )
     assert response.status_code == 400
     assert response.json()["detail"] == "Only TXT, PDF, DOCX supported"
+
+# -----------------------------
+# 13. TEST RESPONSE TIME EXISTS
+# -----------------------------
+def test_response_time_in_ask():
+    response = client.post("/ask", json={"question": "How many students are registered?"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "response_time_seconds" in data
+    assert isinstance(data["response_time_seconds"], float)
