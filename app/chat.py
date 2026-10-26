@@ -3,8 +3,10 @@ import chromadb
 import ollama
 import logging
 import psycopg2
+from functools import lru_cache
 from openai import OpenAI
-from app.vanna_setup import vn
+from app.vanna_setup import get_vanna
+from app.sql_guard import execute_read_query
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
@@ -13,7 +15,9 @@ from dotenv import load_dotenv
 # -----------------------------
 load_dotenv()
 
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+@lru_cache(maxsize=1)
+def get_openai_client():
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 EMBED_MODEL = "qwen3-embedding:0.6b"
 LLM_MODEL = "gpt-4o-mini"
@@ -26,7 +30,9 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # CHROMA AND DATABASE SETUP
 # -----------------------------
-client = chromadb.PersistentClient(path="./data/chroma_db")
+@lru_cache(maxsize=1)
+def get_chroma_client():
+    return chromadb.PersistentClient(path="./data/chroma_db")
 
 def get_db_connection():
     return psycopg2.connect(
@@ -137,7 +143,7 @@ REASON: <one sentence explanation>
 
 Question: {question}
 """
-    response = openai_client.chat.completions.create(
+    response = get_openai_client().chat.completions.create(
         model=LLM_MODEL,
         messages=[{"role": "user", "content": prompt}]
     )
@@ -170,7 +176,7 @@ def classify_intent(question: str):
 # ORCHESTRATOR
 # -----------------------------
 def run_rag(question: str):
-    collection = client.get_or_create_collection(name=COLLECTION_NAME)
+    collection = get_chroma_client().get_or_create_collection(name=COLLECTION_NAME)
 
     query_embedding = ollama.embed(
         model=EMBED_MODEL,
@@ -202,7 +208,7 @@ Question:
 
 Answer:
 """
-    response = openai_client.chat.completions.create(
+    response = get_openai_client().chat.completions.create(
         model=LLM_MODEL,
         messages=[{"role": "user", "content": prompt}]
     )
@@ -210,15 +216,12 @@ Answer:
     return response.choices[0].message.content, sources
 
 def run_sql(question: str):
-    sql = vn.generate_sql(question=question)
-    if not sql.strip().upper().startswith("SELECT"):
-        raise ValueError(f"Vanna could not generate SQL: {sql}")
-
-    df = vn.run_sql(sql=sql)
-    if df.empty:
+    sql = get_vanna().generate_sql(question=question)
+    rows = execute_read_query(sql)
+    if not rows:
         return "No data found.", sql, []
-    
-    data_as_text = df.to_string(index=False)
+
+    data_as_text = "\n".join(str(row) for row in rows)
 
     prompt = f"""
 You are a data analyst. Answer the question directly and concisely based on the query result below.
@@ -234,8 +237,8 @@ Question:
 
 Answer:
 """
-    response = openai_client.chat.completions.create(
+    response = get_openai_client().chat.completions.create(
         model=LLM_MODEL,
         messages=[{"role": "user", "content": prompt}]
     )
-    return response.choices[0].message.content, sql, df.to_dict(orient="records")
+    return response.choices[0].message.content, sql, rows

@@ -1,4 +1,8 @@
 import os
+import re
+from collections import Counter
+from functools import lru_cache
+from pathlib import Path
 import chromadb
 import ollama
 from pypdf import PdfReader
@@ -8,10 +12,23 @@ from docx import Document
 # CONFIG
 # -----------------------------
 EMBED_MODEL = "qwen3-embedding:0.6b"
-DOCS_FOLDER = "./data/docs"
+DOCS_FOLDER = Path(__file__).resolve().parents[1] / "data" / "docs"
 COLLECTION_NAME = "docs"
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,123}\.(txt|pdf|docx)$", re.IGNORECASE)
+WINDOWS_RESERVED_NAMES = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
 
-client = chromadb.PersistentClient(path="./data/chroma_db")
+@lru_cache(maxsize=1)
+def get_client():
+    return chromadb.PersistentClient(path=str(DOCS_FOLDER.parent / "chroma_db"))
+
+
+def document_path(filename: str) -> Path:
+    if (not isinstance(filename, str) or len(filename) > 128
+            or not FILENAME_PATTERN.fullmatch(filename)
+            or filename.split(".", 1)[0].upper() in WINDOWS_RESERVED_NAMES):
+        raise ValueError("Use a plain TXT, PDF, or DOCX filename (max 128 characters)")
+    return DOCS_FOLDER / filename
 
 # -----------------------------
 # CHUNKING FUNCTION
@@ -34,12 +51,13 @@ def chunk_text(text, chunk_size=50, overlap=5):
 # TEXT EXTRACTION
 # -----------------------------
 def extract_text(filepath):
+    suffix = str(filepath).lower()
 
-    if filepath.endswith(".txt"):
+    if suffix.endswith(".txt"):
         with open(filepath, "r", encoding="utf-8") as f:
             return f.read()
 
-    elif filepath.endswith(".pdf"):
+    elif suffix.endswith(".pdf"):
         reader = PdfReader(filepath)
         text = ""
 
@@ -50,7 +68,7 @@ def extract_text(filepath):
 
         return text
 
-    elif filepath.endswith(".docx"):
+    elif suffix.endswith(".docx"):
         doc = Document(filepath)
         text = ""
 
@@ -65,7 +83,7 @@ def extract_text(filepath):
 # INDEX ONE FILE
 # -----------------------------
 def index_file(filepath, filename):
-    collection = client.get_or_create_collection(name=COLLECTION_NAME)
+    collection = get_client().get_or_create_collection(name=COLLECTION_NAME)
 
     text = extract_text(filepath)
 
@@ -107,17 +125,22 @@ def index_file(filepath, filename):
 # -----------------------------
 def reindex_documents():
     try:
-        client.delete_collection(name=COLLECTION_NAME)
+        get_client().delete_collection(name=COLLECTION_NAME)
     except Exception:
         pass
 
     total_chunks = 0
 
+    DOCS_FOLDER.mkdir(parents=True, exist_ok=True)
     for filename in os.listdir(DOCS_FOLDER):
-        filepath = os.path.join(DOCS_FOLDER, filename)
+        filepath = DOCS_FOLDER / filename
 
-        if filename.endswith((".txt", ".pdf", ".docx")):
-            total_chunks += index_file(filepath, filename)
+        if filepath.is_file():
+            try:
+                document_path(filename)
+            except ValueError:
+                continue
+            total_chunks += index_file(str(filepath), filename)
 
     return total_chunks
 
@@ -125,7 +148,8 @@ def reindex_documents():
 # DELETE FILE
 # -----------------------------
 def delete_file(filename: str) -> int:
-    collection = client.get_or_create_collection(name=COLLECTION_NAME)
+    filepath = document_path(filename)
+    collection = get_client().get_or_create_collection(name=COLLECTION_NAME)
 
     # Get all chunk IDs belonging to this file
     results = collection.get(where={"source": filename})
@@ -136,8 +160,28 @@ def delete_file(filename: str) -> int:
     collection.delete(ids=results["ids"])
 
     # Delete physical file from disk too
-    filepath = os.path.join(DOCS_FOLDER, filename)
     if os.path.exists(filepath):
         os.remove(filepath)
 
     return len(results["ids"])
+
+
+def list_documents() -> list[dict]:
+    collection = get_client().get_or_create_collection(name=COLLECTION_NAME)
+    counts = Counter(
+        metadata["source"]
+        for metadata in collection.get(include=["metadatas"])["metadatas"]
+        if metadata and metadata.get("source")
+    )
+    documents = []
+    for filename, count in sorted(counts.items()):
+        try:
+            filepath = document_path(filename)
+        except ValueError:
+            continue
+        documents.append({
+            "doc_id": filename,
+            "chunks_indexed": count,
+            "size_bytes": filepath.stat().st_size if filepath.is_file() else None,
+        })
+    return documents

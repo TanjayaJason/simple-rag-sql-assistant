@@ -1,5 +1,6 @@
 # frontend/api.py
 import httpx
+from urllib.parse import quote
 
 BASE_URL = "http://localhost:8000"
 
@@ -64,9 +65,17 @@ def reindex() -> dict:
 def delete_document(doc_id: str) -> dict:
     try:
         response = httpx.delete(
-            f"{BASE_URL}/docs/{doc_id}",
+            f"{BASE_URL}/docs/{quote(doc_id, safe='')}",
             timeout=10.0
         )
+        return response.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def list_documents() -> dict:
+    try:
+        response = httpx.get(f"{BASE_URL}/documents", timeout=10.0)
         return response.json()
     except Exception as e:
         return {"error": str(e)}

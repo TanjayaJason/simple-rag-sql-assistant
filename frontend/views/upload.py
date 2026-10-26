@@ -1,6 +1,8 @@
 import streamlit as st
 from api import upload_document, reindex
 
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
 def show():
     st.title("📄 Upload Document")
     st.markdown("Upload a document to the RAG knowledge base.")
@@ -14,7 +16,10 @@ def show():
     if uploaded_file:
         st.info(f"File selected: **{uploaded_file.name}** ({uploaded_file.size} bytes)")
 
-        if st.button("Upload & Index", type="primary"):
+        if uploaded_file.size > MAX_UPLOAD_BYTES:
+            st.error("The maximum upload size is 10 MB.")
+
+        if st.button("Upload & Index", type="primary", disabled=uploaded_file.size > MAX_UPLOAD_BYTES):
             with st.spinner("Uploading and indexing..."):
                 result = upload_document(
                     uploaded_file.read(),
@@ -23,6 +28,8 @@ def show():
 
             if "error" in result:
                 st.error(f"Upload failed: {result['error']}")
+            elif "detail" in result:
+                st.error(f"Upload failed: {result['detail']}")
             else:
                 st.success(f"✅ {result.get('message', 'Upload successful')}")
                 st.metric("Chunks Indexed", result.get("chunks_indexed", 0))
@@ -36,6 +43,8 @@ def show():
             result = reindex()
         if "error" in result:
             st.error(f"Reindex failed: {result['error']}")
+        elif "detail" in result:
+            st.error(f"Reindex failed: {result['detail']}")
         else:
             st.success(f"✅ {result.get('message', 'Reindex complete')}")
             st.metric("Total Chunks Indexed", result.get("chunks_indexed", 0))

@@ -1,5 +1,5 @@
 # Agentic RAG + Text2SQL Backend
-A FastAPI backend that answers natural language questions by routing to either a SQL database (via Vanna AI) or a document knowledge base (via ChromaDB RAG).
+A FastAPI backend and Streamlit frontend that answer natural language questions by routing to either a SQL database (via Vanna AI) or a document knowledge base (via ChromaDB RAG).
 
 ---
 
@@ -37,6 +37,9 @@ DB_USER=your_db_user
 DB_PASSWORD=your_db_password
 DB_PORT=5432
 OPENAI_API_KEY=sk-...
+# Recommended for generated SQL: a separate PostgreSQL role with SELECT grants only
+DB_READ_USER=your_read_only_user
+DB_READ_PASSWORD=your_read_only_password
 ```
 
 ### 4. Set up the database
@@ -53,6 +56,13 @@ uvicorn app.main:app --reload
 ```
 
 Swagger UI available at: http://localhost:8000/docs
+
+Start the Streamlit frontend in a second terminal:
+```bash
+streamlit run frontend/main.py
+```
+
+Uploads accept TXT, PDF, or DOCX files up to 10 MB. Filenames must be plain names without path separators. Uploading an existing name returns HTTP 409; delete it first or choose a different name.
 
 ---
 
@@ -133,6 +143,17 @@ CREATE TABLE conversation_history (
 );
 ```
 
+For generated SQL, configure a separate PostgreSQL role that can only read the business tables. For example, run the following as an administrator and replace the sample password:
+
+```sql
+CREATE ROLE rag_reader LOGIN PASSWORD 'replace-with-a-strong-password';
+GRANT CONNECT ON DATABASE your_db_name TO rag_reader;
+GRANT USAGE ON SCHEMA public TO rag_reader;
+GRANT SELECT ON courses, students, enrollments TO rag_reader;
+```
+
+Set `DB_READ_USER=rag_reader` and `DB_READ_PASSWORD` in `.env`. Generated queries also run in a read-only transaction with a 10-second statement timeout. If the read credentials are omitted, the app falls back to `DB_USER` and `DB_PASSWORD` while still using a read-only transaction.
+
 ---
 
 ## API Reference
@@ -140,11 +161,12 @@ CREATE TABLE conversation_history (
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | /health | Service liveness check |
-| POST | /ask | Ask a question (auto-routes to SQL or RAG via LangChain agent) |
+| POST | /ask | Ask a question (auto-routes to SQL or RAG) |
 | POST | /train | Add new Vanna training data |
 | POST | /upload | Upload document to RAG store |
 | POST | /reindex | Reindex all documents |
 | GET | /history | Get recent Q&A history |
+| GET | /documents | List indexed documents |
 | DELETE | /docs/{doc_id} | Remove document from store |
 
 ---
@@ -193,6 +215,8 @@ curl -X DELETE http://localhost:8000/docs/chromadb.txt
 | DB_PASSWORD | PostgreSQL password |
 | DB_PORT | PostgreSQL port (default: 5432) |
 | OPENAI_API_KEY | Your OpenAI API key |
+| DB_READ_USER | Optional SELECT-only PostgreSQL user for generated queries |
+| DB_READ_PASSWORD | Password for `DB_READ_USER` |
 
 ---
 
@@ -216,7 +240,8 @@ project/
 │   └── vanna_chroma/       # Vanna vector store
 │
 ├── tests/
-│   └── test_chat.py        # Pytest tests
+│   ├── test_chat.py        # API tests with mocked services
+│   └── test_sql_guard.py   # SQL validation and read-only execution tests
 │
 ├── .env
 ├── .gitignore
@@ -228,5 +253,7 @@ project/
 
 ## Running Tests
 ```bash
-pytest tests/test_chat.py -v
+pytest -q
 ```
+
+The tests mock external services; no running database, Ollama server, or OpenAI key is needed.

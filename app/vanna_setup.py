@@ -5,13 +5,16 @@ from chromadb.utils.embedding_functions import EmbeddingFunction
 from openai import OpenAI
 import os
 import ollama
+from functools import lru_cache
 
 # -----------------------------
 # CONFIG
 # -----------------------------
 load_dotenv()
 
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+@lru_cache(maxsize=1)
+def get_openai_client():
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 EMBED_MODEL = "qwen3-embedding:0.6b"
 LLM_MODEL = "gpt-4o-mini"
@@ -58,7 +61,7 @@ class MyVanna(ChromaDB_VectorStore, VannaBase):
         else:
             messages = [{"role": "user", "content": prompt}]
 
-        response = openai_client.chat.completions.create(
+        response = get_openai_client().chat.completions.create(
             model=LLM_MODEL,
             messages=messages
         )
@@ -76,19 +79,18 @@ class MyVanna(ChromaDB_VectorStore, VannaBase):
 # -----------------------------
 # INITIALIZE VANNA
 # -----------------------------
-vn = MyVanna(config={
-    "path": "./data/vanna_chroma",
-    "embedding_function": OllamaEmbeddingFunction(),
-    "n_results": 10,
-})
-
-# -----------------------------
-# CONNECT POSTGRES
-# -----------------------------
-vn.connect_to_postgres(
-    host=os.getenv("DB_HOST"),
-    dbname=os.getenv("DB_NAME"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    port=os.getenv("DB_PORT")
-)
+@lru_cache(maxsize=1)
+def get_vanna():
+    vn = MyVanna(config={
+        "path": "./data/vanna_chroma",
+        "embedding_function": OllamaEmbeddingFunction(),
+        "n_results": 10,
+    })
+    vn.connect_to_postgres(
+        host=os.getenv("DB_HOST"),
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        port=os.getenv("DB_PORT")
+    )
+    return vn
